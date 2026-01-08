@@ -70,3 +70,6 @@ async def top_skills():
 
     skills = await skills_collection.aggregate(pipeline).to_list(None)
     return [{"skill": s["_id"], "count": s["count"]} for s in skills]
+@app.get("/")
+def root():
+    return {"message": "Me-API Backend is running"}
