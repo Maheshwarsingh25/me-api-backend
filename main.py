@@ -28,37 +28,38 @@ async def get_projects(skill: str | None = None):
     if skill:
         query = {"skills": skill.lower()}
 
-    return [p async for p in projects_collection.find(query, {"_id": 0})]
+    projects = []
+    async for p in projects_collection.find(query, {"_id": 0}):
+        projects.append(p)
+
+    return projects
 
 # ---------------- SEARCH ----------------
 @app.get("/search")
-async def search(q: str):
+def search(q: str = Query(...)):
+    profile = profile_collection.find_one()
+
+    if not profile:
+        return {"skills": [], "projects": []}
+
     q = q.lower()
 
-    projects = [
-        p async for p in projects_collection.find(
-            {
-                "$or": [
-                    {"title": {"$regex": q, "$options": "i"}},
-                    {"description": {"$regex": q, "$options": "i"}},
-                    {"skills": q}
-                ]
-            },
-            {"_id": 0}
-        )
+    skills = [
+        skill for skill in profile.get("skills", [])
+        if q in skill.lower()
     ]
 
-    skills = [
-        s async for s in skills_collection.find(
-            {"name": {"$regex": q, "$options": "i"}},
-            {"_id": 0}
-        )
+    projects = [
+        project for project in profile.get("projects", [])
+        if q in project.get("title", "").lower()
+        or q in project.get("description", "").lower()
     ]
 
     return {
-        "projects": projects,
-        "skills": skills
+        "skills": skills,
+        "projects": projects
     }
+
 
 # ---------------- TOP SKILLS ----------------
 @app.get("/skills/top")
@@ -69,7 +70,10 @@ async def top_skills():
     ]
 
     skills = await skills_collection.aggregate(pipeline).to_list(None)
+
     return [{"skill": s["_id"], "count": s["count"]} for s in skills]
+
+# ---------------- ROOT ----------------
 @app.get("/")
 def root():
     return {"message": "Me-API Backend is running"}
