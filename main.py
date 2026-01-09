@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Query
+
 from fastapi.middleware.cors import CORSMiddleware
 from database import profile_collection, projects_collection, skills_collection
 
@@ -36,29 +38,23 @@ async def get_projects(skill: str | None = None):
 
 # ---------------- SEARCH ----------------
 @app.get("/search")
-def search(q: str = Query(...)):
-    profile = profile_collection.find_one()
+async def search(q: str):
+    try:
+        projects = await projects_collection.find(
+            {"skills": {"$regex": q, "$options": "i"}}
+        ).to_list(10)
 
-    if not profile:
-        return {"skills": [], "projects": []}
+        skills = await skills_collection.find(
+            {"name": {"$regex": q, "$options": "i"}}
+        ).to_list(10)
 
-    q = q.lower()
+        return {
+            "projects": projects,
+            "skills": [s["name"] for s in skills]
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
-    skills = [
-        skill for skill in profile.get("skills", [])
-        if q in skill.lower()
-    ]
-
-    projects = [
-        project for project in profile.get("projects", [])
-        if q in project.get("title", "").lower()
-        or q in project.get("description", "").lower()
-    ]
-
-    return {
-        "skills": skills,
-        "projects": projects
-    }
 
 
 # ---------------- TOP SKILLS ----------------
